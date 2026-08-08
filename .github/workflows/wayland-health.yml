@@ -1,0 +1,88 @@
+name: Wayland Patch Health Check
+
+on:
+  schedule:
+    - cron: '30 4 * * 1'   # Mondays 04:30 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  health:
+    name: Check patch sources are alive
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check T1mbits fork reachability
+        id: t1mbits
+        run: |
+          STATUS=$(curl -sI https://github.com/T1mbits/Vesktop/tree/wayland-idle -o /dev/null -w "%{http_code}")
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+          if [ "$STATUS" != "200" ]; then
+            echo "::warning::T1mbits fork returned HTTP $STATUS — our fork is self-contained so builds still work"
+          fi
+
+      - name: Check if wayland patch merged into upstream
+        id: upstream_check
+        run: |
+          git fetch https://github.com/Vencord/Vesktop.git main --depth=10 2>/dev/null
+          if git show FETCH_HEAD:src/main/waylandIdle.ts > /dev/null 2>&1; then
+            echo "merged=true" >> $GITHUB_OUTPUT
+          else
+            echo "merged=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check patch still applies cleanly to current HEAD
+        id: patch_apply
+        run: |
+          git remote add t1mbits https://github.com/T1mbits/Vesktop.git 2>/dev/null || true
+          git fetch t1mbits wayland-idle --depth=50 2>/dev/null || {
+            echo "applies=unknown" >> $GITHUB_OUTPUT
+            exit 0
+          }
+          PATCH_COMMIT=$(git log --oneline t1mbits/wayland-idle ^FETCH_HEAD 2>/dev/null | grep -v "^$" | tail -1 | awk '{print $1}')
+          if [ -n "$PATCH_COMMIT" ]; then
+            git checkout -b _test_apply HEAD 2>/dev/null
+            if git cherry-pick "$PATCH_COMMIT" --no-commit 2>/dev/null; then
+              echo "applies=true" >> $GITHUB_OUTPUT
+            else
+              echo "applies=false" >> $GITHUB_OUTPUT
+            fi
+            git cherry-pick --abort 2>/dev/null || true
+            git checkout main
+            git branch -D _test_apply 2>/dev/null || true
+          else
+            echo "applies=nocommit" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Open issue if problems detected
+        if: |
+          steps.t1mbits.outputs.status != '200' ||
+          steps.upstream_check.outputs.merged == 'true' ||
+          steps.patch_apply.outputs.applies == 'false'
+        run: |
+          BODY="## Wayland Patch Health Report — $(date -u +%Y-%m-%d)\n\n"
+          [ "${{ steps.t1mbits.outputs.status }}" != "200" ] && \
+            BODY+="- ⚠️ **T1mbits fork is unreachable** (HTTP ${{ steps.t1mbits.outputs.status }}) — Owlcord is self-contained, no action required unless you want to pull future improvements\n"
+          [ "${{ steps.upstream_check.outputs.merged }}" = "true" ] && \
+            BODY+="- ✅ **Wayland idle patch was merged upstream!** — Consider removing our cherry-pick to keep history clean\n"
+          [ "${{ steps.patch_apply.outputs.applies }}" = "false" ] && \
+            BODY+="- ❌ **Wayland patch no longer applies cleanly** — upstream may have changed conflicting files. Manual rebase needed.\n"
+
+          gh issue create \
+            --title "🦉 Wayland Patch Health Alert — $(date -u +%Y-%m-%d)" \
+            --body "$(printf "$BODY")" \
+            --label "patch-health"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: All healthy
+        if: |
+          steps.t1mbits.outputs.status == '200' &&
+          steps.upstream_check.outputs.merged == 'false' &&
+          steps.patch_apply.outputs.applies == 'true'
+        run: echo "✅ All patch sources healthy — T1mbits fork alive, patch not yet in upstream, applies cleanly."

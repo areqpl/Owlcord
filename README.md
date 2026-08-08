@@ -1,60 +1,142 @@
-# Vesktop
+<div align="center">
+  <h1>🦉 Owlcord</h1>
+  <p><strong>A self-maintaining Vesktop fork with Wayland idle inhibition</strong></p>
 
-Vesktop is a custom Discord desktop app
+  <p>
+    <img src="https://img.shields.io/github/v/release/areqpl/Owlcord?label=release&style=flat-square&color=7c5cbf" />
+    <img src="https://img.shields.io/github/actions/workflow/status/areqpl/Owlcord/sync-upstream.yml?label=upstream+sync&style=flat-square" />
+    <img src="https://img.shields.io/github/actions/workflow/status/areqpl/Owlcord/wayland-health.yml?label=wayland+health&style=flat-square&color=3fb950" />
+    <img src="https://img.shields.io/badge/platform-linux--wayland-blue?style=flat-square" />
+  </p>
+</div>
 
-**Main features**:
-- Vencord preinstalled
-- Much more lightweight and faster than the official Discord app
-- Linux Screenshare with sound & wayland
-- Much better privacy, since Discord has no access to your system
+---
 
-**Not yet supported**:
-- Global Keybinds
-- see the [Roadmap](https://github.com/Vencord/Vesktop/issues/324)
+## What is Owlcord?
 
-![](https://github.com/Vencord/Vesktop/assets/45497981/8608a899-96a9-4027-9725-2cb02ba189fd)
-![](https://github.com/Vencord/Vesktop/assets/45497981/8701e5de-52c4-4346-a990-719cb971642e)
+Owlcord is a personal fork of [Vencord/Vesktop](https://github.com/Vencord/Vesktop) that:
 
-## Installing
+1. **Tracks upstream automatically** — a GitHub Action syncs `main` with `Vencord/Vesktop` every day at 04:00 UTC and reapplies the wayland patch on top.
+2. **Adds Wayland idle inhibition** — cherry-picks the [`feat(waylandIdle)`](https://github.com/T1mbits/Vesktop/tree/wayland-idle) patch from [@T1mbits](https://github.com/T1mbits), which prevents your screen from dimming or locking mid-call on Wayland compositors.
+3. **Is resilient to upstream changes** — if the patch is ever merged into Vesktop proper, the health-check workflow detects it and opens an issue to clean up. If T1mbits' fork disappears, Owlcord remains self-contained.
+4. **Keeps dependencies fresh** — Dependabot opens weekly PRs for npm dependency updates (Electron major bumps excluded to protect the native wayland module).
 
-Visit https://vesktop.dev/install
+---
 
-## Building from Source
+## Features
 
-You need to have the following dependencies installed:
-- [Git](https://git-scm.com/downloads)
-- [Node.js](https://nodejs.org/en/download)
-- pnpm: `npm install --global pnpm`
+| Feature | Status |
+|---------|--------|
+| [Vencord](https://github.com/Vendicated/Vencord) preinstalled | ✅ |
+| Linux screenshare with sound & Wayland | ✅ |
+| **Wayland idle inhibition** (no screen lock during calls) | ✅ Owlcord exclusive |
+| Daily upstream sync | ✅ |
+| Weekly dep updates (Dependabot) | ✅ |
+| Weekly patch health checks | ✅ |
+| Lightweight & privacy-respecting | ✅ (upstream feature) |
 
-Packaging will create builds in the dist/ folder
+---
 
-```sh
-git clone https://github.com/Vencord/Vesktop
-cd Vesktop
+## Installation
 
-# Install Dependencies
-pnpm i
+### Arch / CachyOS (recommended)
 
-# Either run it without packaging
-pnpm start
+Download the latest `.pacman` from [Releases](https://github.com/areqpl/Owlcord/releases) and install:
 
-# Or package (will build packages for your OS)
-pnpm package
-
-# Or only build the Linux Pacman package
-pnpm package --linux pacman
-
-# Or package to a directory only
-pnpm package:dir
+```bash
+sudo pacman -U Owlcord-*.pacman
 ```
 
-## Building LibVesktop from Source
+### Debian / Ubuntu
 
-This is a small C++ helper library Vesktop uses on Linux to emit D-Bus events. By default, prebuilt binaries for x64 and arm64 are used.
+```bash
+sudo dpkg -i Owlcord-*.deb
+```
 
-If you want to build it from source:
-1. Install build dependencies:
-    - Debian/Ubuntu: `apt install build-essential python3 curl pkg-config libglib2.0-dev`
-    - Fedora: `dnf install @c-development @development-tools python3 curl pkgconf-pkg-config glib2-devel`
-2. Run `pnpm buildLibVesktop`
-3. From now on, building Vesktop will use your own build
+### Local auto-updating install (personal setup)
+
+If you used the agent-managed install:
+
+```bash
+~/.local/bin/update-vesktop-wayland.sh
+```
+
+### Manual build from source
+
+```bash
+git clone https://github.com/areqpl/Owlcord.git
+cd Owlcord
+pnpm i
+pnpm package:dir   # unpacked to dist/linux-unpacked/
+# or
+pnpm package --linux pacman
+```
+
+---
+
+## Wayland Launch Flags
+
+For best Wayland experience, launch with:
+
+```bash
+vesktop \
+  --ozone-platform=wayland \
+  --enable-features=WaylandWindowDecorations,UseOzonePlatform,WebRTCPipeWireCapturer \
+  --enable-wayland-ime \
+  --use-gl=egl
+```
+
+These are automatically applied by the agent-managed wrapper at `~/.local/bin/vesktop`.
+
+---
+
+## Automation Overview
+
+```
+                    ┌─────────────────────────────────────┐
+                    │         GitHub Actions               │
+                    │                                      │
+  Vencord/Vesktop ──► sync-upstream.yml (daily 04:00 UTC) │
+                    │   └─ FF-merge upstream/main          │
+  T1mbits wayland ──►    └─ cherry-pick waylandIdle patch  │
+                    │       └─ push → origin/main           │
+                    │                                      │
+                    │ build-release.yml (on push to main)  │
+                    │   └─ pnpm package → .pacman + .deb  │
+                    │       └─ GitHub Release              │
+                    │                                      │
+                    │ wayland-health.yml (weekly Mon)      │
+                    │   └─ T1mbits fork alive?             │
+                    │   └─ Patch merged upstream?          │
+                    │   └─ Cherry-pick still clean?        │
+                    │       └─ Open issue if problems       │
+                    │                                      │
+                    │ Dependabot (weekly Mon)              │
+                    │   └─ npm updates → PRs               │
+                    └─────────────────────────────────────┘
+```
+
+---
+
+## Conflict handling
+
+| Scenario | Behaviour |
+|----------|-----------|
+| Wayland patch already in upstream | Sync skips cherry-pick, health workflow opens cleanup issue |
+| Cherry-pick conflicts on sync | Upstream base still pushed; issue opened for manual rebase |
+| T1mbits fork goes offline | Owlcord is self-contained — no impact on builds |
+| Electron major bump | Dependabot PR created but not auto-merged — requires manual validation of native wayland module |
+
+---
+
+## Credits
+
+- [Vencord/Vesktop](https://github.com/Vencord/Vesktop) — upstream project by [@Vendicated](https://github.com/Vendicated)
+- [T1mbits/Vesktop@wayland-idle](https://github.com/T1mbits/Vesktop/tree/wayland-idle) — Wayland idle inhibition patch by [@T1mbits](https://github.com/T1mbits)
+- Owlcord maintained by [@areqpl](https://github.com/areqpl)
+
+---
+
+<div align="center">
+  <sub>Owlcord is not affiliated with Discord Inc.</sub>
+</div>

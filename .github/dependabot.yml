@@ -1,0 +1,25 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+    open-pull-requests-limit: 5
+    groups:
+      electron-ecosystem:
+        patterns:
+          - "electron*"
+          - "@electron/*"
+      vencord-deps:
+        patterns:
+          - "@vencord/*"
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "chore(deps)"
+    ignore:
+      # Don't auto-bump electron major — wayland patch targets specific electron version
+      - dependency-name: "electron"
+        update-types: ["version-update:semver-major"]

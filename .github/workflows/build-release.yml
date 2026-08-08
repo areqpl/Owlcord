@@ -1,0 +1,85 @@
+name: Build & Release
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - '.github/workflows/sync-upstream.yml'
+      - '.github/workflows/wayland-health.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Linux (x64)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm i
+
+      - name: Package (dir + pacman + deb)
+        run: |
+          pnpm package:dir
+          pnpm package --linux pacman deb
+
+      - name: Get version
+        id: ver
+        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
+      - name: Get commit info
+        id: commit
+        run: |
+          echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "date=$(date -u +%Y-%m-%d)" >> $GITHUB_OUTPUT
+
+      - name: Create/update release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.version }}-owlcord
+          name: "Owlcord v${{ steps.ver.outputs.version }} (${{ steps.commit.outputs.date }})"
+          body: |
+            ## Owlcord v${{ steps.ver.outputs.version }}
+
+            > Built from `areqpl/Owlcord@${{ steps.commit.outputs.sha }}` · ${{ steps.commit.outputs.date }}
+
+            Upstream: [Vencord/Vesktop](https://github.com/Vencord/Vesktop) + [wayland-idle patch](https://github.com/T1mbits/Vesktop/tree/wayland-idle)
+
+            ### What's included
+            - ✅ All upstream Vesktop features (Vencord preinstalled, Linux screenshare)
+            - ✅ **Wayland idle inhibition** — prevents screen dimming/locking during calls
+            - ✅ Wayland-optimized launcher flags (ozone, WaylandWindowDecorations, WebRTC PipeWire)
+
+            ### Install (Arch/CachyOS)
+            ```bash
+            # Download .pacman below and install:
+            sudo pacman -U Owlcord-*.pacman
+            # Or use the auto-updater if you installed via agent setup:
+            ~/.local/bin/update-vesktop-wayland.sh
+            ```
+
+            ### Manual launch flags
+            ```
+            --ozone-platform=wayland --enable-features=WaylandWindowDecorations,UseOzonePlatform,WebRTCPipeWireCapturer --enable-wayland-ime
+            ```
+          files: |
+            dist/*.pacman
+            dist/*.deb
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,105 @@
+name: Sync Upstream & Reapply Wayland Patch
+
+on:
+  schedule:
+    - cron: '0 4 * * *'   # 04:00 UTC daily
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Force rebuild even if no upstream changes'
+        required: false
+        default: 'false'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    name: Sync Vencord/Vesktop → main
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Owlcord
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git identity
+        run: |
+          git config user.name  "Owlcord Bot"
+          git config user.email "owlcord-bot@users.noreply.github.com"
+
+      - name: Add remotes
+        run: |
+          git remote add upstream  https://github.com/Vencord/Vesktop.git  || true
+          git remote add t1mbits   https://github.com/T1mbits/Vesktop.git  || true
+          git fetch upstream  main --depth=100
+          git fetch t1mbits   wayland-idle --depth=100
+
+      - name: Check for upstream changes
+        id: diff
+        run: |
+          UPSTREAM_SHA=$(git rev-parse upstream/main)
+          LOCAL_SHA=$(git rev-parse origin/main)
+          echo "upstream=$UPSTREAM_SHA" >> $GITHUB_OUTPUT
+          echo "local=$LOCAL_SHA"       >> $GITHUB_OUTPUT
+          if [ "$UPSTREAM_SHA" = "$LOCAL_SHA" ] && [ "${{ github.event.inputs.force }}" != "true" ]; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true"  >> $GITHUB_OUTPUT
+          fi
+
+      - name: Detect wayland patch already in upstream
+        id: patch_check
+        run: |
+          # Check if waylandIdle.ts exists in upstream (patch already merged)
+          if git show upstream/main:src/main/waylandIdle.ts > /dev/null 2>&1; then
+            echo "patch_in_upstream=true" >> $GITHUB_OUTPUT
+            echo "::notice::Wayland idle patch detected in upstream — skipping cherry-pick"
+          else
+            echo "patch_in_upstream=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Sync + reapply patch
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          # Find the single wayland-idle-only commit (squashed feat commit)
+          WAYLAND_COMMIT=$(git log --oneline t1mbits/wayland-idle ^upstream/main | grep "waylandIdle\|wayland-idle\|wayland_idle" | head -1 | awk '{print $1}')
+          if [ -z "$WAYLAND_COMMIT" ]; then
+            # Fallback: first commit unique to t1mbits branch
+            WAYLAND_COMMIT=$(git log --oneline t1mbits/wayland-idle ^upstream/main | tail -1 | awk '{print $1}')
+          fi
+          echo "Wayland patch commit: $WAYLAND_COMMIT"
+
+          # Fast-forward main to upstream
+          git checkout main
+          git merge --ff-only upstream/main || {
+            echo "::error::FF merge failed — upstream may have diverged. Manual intervention needed."
+            exit 1
+          }
+
+          # Re-apply wayland patch if not already in upstream
+          if [ "${{ steps.patch_check.outputs.patch_in_upstream }}" = "false" ] && [ -n "$WAYLAND_COMMIT" ]; then
+            git cherry-pick "$WAYLAND_COMMIT" -x --allow-empty || {
+              echo "::warning::Cherry-pick conflict — creating draft PR for manual review"
+              git cherry-pick --abort
+              # Push base sync without patch; open issue
+              git push origin main
+              gh issue create \
+                --title "⚠️ Wayland patch conflict after upstream sync $(date +%Y-%m-%d)" \
+                --body "Upstream sync succeeded but the wayland-idle cherry-pick conflicted. Manual resolution needed. Upstream commit: ${{ steps.diff.outputs.upstream }}" \
+                --label "patch-conflict"
+              exit 0
+            }
+          fi
+
+          git push origin main
+          echo "::notice::Sync complete → $(git rev-parse --short HEAD)"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: No changes
+        if: steps.diff.outputs.changed == 'false'
+        run: echo "Already in sync with upstream — nothing to do."
