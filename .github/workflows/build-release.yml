@@ -36,7 +36,9 @@ jobs:
       - name: Package (dir + pacman + deb)
         run: |
           pnpm package:dir
-          pnpm package --linux pacman deb
+          pnpm package --linux pacman deb --publish never
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Get version
         id: ver
