@@ -30,6 +30,9 @@ jobs:
       - name: Install dependencies
         run: pnpm i
 
+      - name: Install pacman build dependencies
+        run: sudo apt-get update && sudo apt-get install -y bsdtar libarchive-tools
+
       - name: Package (dir + pacman + deb)
         run: |
           pnpm package:dir
