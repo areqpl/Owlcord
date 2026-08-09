@@ -14,8 +14,16 @@ permissions:
 
 jobs:
   build:
-    name: Build Linux (x64)
-    runs-on: ubuntu-latest
+    name: Build (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: windows-latest
+            platform: windows
 
     steps:
       - uses: actions/checkout@v4
@@ -30,15 +38,50 @@ jobs:
       - name: Install dependencies
         run: pnpm i
 
-      - name: Install pacman build dependencies
+      - name: Install pacman build dependencies (Linux)
+        if: matrix.platform == 'linux'
         run: sudo apt-get update && sudo apt-get install -y libarchive-tools
 
-      - name: Package (dir + pacman + deb)
+      - name: Package Linux
+        if: matrix.platform == 'linux'
         run: |
           pnpm package:dir
-          pnpm package --linux pacman deb --publish never
+          pnpm package --linux pacman deb AppImage rpm --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Package Windows
+        if: matrix.platform == 'windows'
+        run: |
+          pnpm package --win nsis zip --publish never
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts-${{ matrix.platform }}
+          path: |
+            dist/*.pacman
+            dist/*.deb
+            dist/*.AppImage
+            dist/*.rpm
+            dist/*.exe
+            dist/*.zip
+
+  release:
+    name: Publish Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          pattern: build-artifacts-*
+          merge-multiple: true
 
       - name: Get version
         id: ver
@@ -63,25 +106,18 @@ jobs:
             Upstream: [Vencord/Vesktop](https://github.com/Vencord/Vesktop) + [wayland-idle patch](https://github.com/T1mbits/Vesktop/tree/wayland-idle)
 
             ### What's included
-            - ✅ All upstream Vesktop features (Vencord preinstalled, Linux screenshare)
-            - ✅ **Wayland idle inhibition** — prevents screen dimming/locking during calls
+            - ✅ **Owlcord branding** & native package name
+            - ✅ All upstream features (Vencord preinstalled, screenshare)
+            - ✅ **Wayland idle inhibition** — prevents screen dimming/locking during calls (Linux)
             - ✅ Wayland-optimized launcher flags (ozone, WaylandWindowDecorations, WebRTC PipeWire)
+            - ✅ Universal multi-platform release (Linux & Windows)
 
-            ### Install (Arch/CachyOS)
-            ```bash
-            # Download .pacman below and install:
-            sudo pacman -U Owlcord-*.pacman
-            # Or use the auto-updater if you installed via agent setup:
-            ~/.local/bin/update-vesktop-wayland.sh
-            ```
-
-            ### Manual launch flags
-            ```
-            --ozone-platform=wayland --enable-features=WaylandWindowDecorations,UseOzonePlatform,WebRTCPipeWireCapturer --enable-wayland-ime
-            ```
+            ### Install
+            - **Arch / CachyOS**: `sudo pacman -U Owlcord-*.pacman` or `sudo pacman -U owlcord-*.pacman`
+            - **Debian / Ubuntu**: `sudo dpkg -i owlcord-*.deb`
+            - **Windows**: Run `Owlcord-Setup-*.exe` installer or extract portable `Owlcord-win-*.zip`
           files: |
-            dist/*.pacman
-            dist/*.deb
+            release-artifacts/*
           draft: false
           prerelease: false
         env:

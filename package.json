@@ -1,8 +1,8 @@
 {
-    "name": "vesktop",
+    "name": "owlcord",
     "version": "1.6.5",
     "private": true,
-    "description": "Vesktop is a custom Discord desktop app",
+    "description": "Owlcord is a custom Discord desktop app",
     "keywords": [],
     "homepage": "https://vencord.dev/",
     "license": "GPL-3.0-or-later",
@@ -68,9 +68,9 @@
         "pnpm": ">=11"
     },
     "build": {
-        "appId": "dev.vencord.vesktop",
-        "productName": "Vesktop",
-        "executableName": "vesktop",
+        "appId": "dev.owlcord.owlcord",
+        "productName": "Owlcord",
+        "executableName": "owlcord",
         "files": [
             "!*",
             "!node_modules",
@@ -123,13 +123,13 @@
             ],
             "desktop": {
                 "entry": {
-                    "Name": "Vesktop",
+                    "Name": "Owlcord",
                     "GenericName": "Internet Messenger",
                     "Type": "Application",
                     "Categories": "Network;InstantMessaging;Chat;",
-                    "Keywords": "discord;vencord;electron;chat;",
+                    "Keywords": "discord;vencord;electron;chat;owlcord;",
                     "MimeType": "x-scheme-handler/discord",
-                    "StartupWMClass": "vesktop"
+                    "StartupWMClass": "owlcord"
                 }
             }
         },
