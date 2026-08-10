@@ -10,7 +10,7 @@ import { UpdaterIpcEvents } from "shared/IpcEvents";
 
 import { invoke } from "./typedIpc";
 
-contextBridge.exposeInMainWorld("VesktopUpdaterNative", {
+const api = {
     getData: () => invoke<UpdateInfo>(UpdaterIpcEvents.GET_DATA),
     installUpdate: () => invoke(UpdaterIpcEvents.INSTALL),
     onProgress: (cb: (percent: number) => void) => {
@@ -21,4 +21,7 @@ contextBridge.exposeInMainWorld("VesktopUpdaterNative", {
     },
     snoozeUpdate: () => invoke(UpdaterIpcEvents.SNOOZE_UPDATE),
     ignoreUpdate: () => invoke(UpdaterIpcEvents.IGNORE_UPDATE)
-});
+};
+
+contextBridge.exposeInMainWorld("OwlcordUpdaterNative", api);
+contextBridge.exposeInMainWorld("VesktopUpdaterNative", api);

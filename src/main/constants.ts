@@ -34,7 +34,7 @@ export const VENCORD_QUICKCSS_FILE = join(VENCORD_SETTINGS_DIR, "quickCss.css");
 export const VENCORD_SETTINGS_FILE = join(VENCORD_SETTINGS_DIR, "settings.json");
 export const VENCORD_THEMES_DIR = join(DATA_DIR, "themes");
 
-export const USER_AGENT = `Vesktop/${app.getVersion()} (https://github.com/Vencord/Vesktop)`;
+export const USER_AGENT = `Owlcord/${app.getVersion()} (https://github.com/areqpl/Owlcord)`;
 
 // dimensions shamelessly stolen from Discord Desktop :3
 export const MIN_WIDTH = 940;
@@ -44,7 +44,7 @@ export const DEFAULT_HEIGHT = 720;
 
 export const DISCORD_HOSTNAMES = ["discord.com", "canary.discord.com", "ptb.discord.com"];
 
-const VersionString = `AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${process.versions.chrome.split(".")[0]}.0.0.0 Safari/537.36`;
+const VersionString = `AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${process.versions.chrome} Safari/537.36`;
 const BrowserUserAgents = {
     darwin: `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) ${VersionString}`,
     linux: `Mozilla/5.0 (X11; Linux x86_64) ${VersionString}`,

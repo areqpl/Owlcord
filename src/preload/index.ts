@@ -9,6 +9,7 @@ import { contextBridge, ipcRenderer, webFrame } from "electron/renderer";
 import { IpcEvents } from "../shared/IpcEvents";
 import { VesktopNative } from "./VesktopNative";
 
+contextBridge.exposeInMainWorld("OwlcordNative", VesktopNative);
 contextBridge.exposeInMainWorld("VesktopNative", VesktopNative);
 
 // While sandboxed, Electron "polyfills" these APIs as local variables.

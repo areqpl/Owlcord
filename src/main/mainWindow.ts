@@ -78,7 +78,7 @@ function initMenuBar(win: BrowserWindow) {
 
     const subMenu = [
         {
-            label: "About Vesktop",
+            label: "About Owlcord",
             click: createAboutWindow
         },
         {
@@ -88,14 +88,14 @@ function initMenuBar(win: BrowserWindow) {
                 app.relaunch();
                 app.quit();
             },
-            toolTip: "Vesktop will automatically restart after this operation"
+            toolTip: "Owlcord will automatically restart after this operation"
         },
         {
-            label: "Reset Vesktop",
+            label: "Reset Owlcord",
             async click() {
                 await clearData(win);
             },
-            toolTip: "Vesktop will automatically restart after this operation"
+            toolTip: "Owlcord will automatically restart after this operation"
         },
         {
             label: "Relaunch",
@@ -162,7 +162,7 @@ function initMenuBar(win: BrowserWindow) {
 
     const menuItems = [
         {
-            label: "Vesktop",
+            label: "Owlcord",
             role: "appMenu",
             submenu: subMenu.filter(isTruthy)
         },
@@ -271,12 +271,32 @@ function initStaticTitle(win: BrowserWindow) {
 
     addSettingsListener("staticTitle", enabled => {
         if (enabled) {
-            win.setTitle("Vesktop");
+            win.setTitle("Owlcord");
             win.on("page-title-updated", listener);
         } else {
             win.off("page-title-updated", listener);
         }
     });
+}
+
+function setupHeaderSanitization(win: BrowserWindow) {
+    win.webContents.session.webRequest.onBeforeSendHeaders(
+        { urls: ["https://*.discord.com/*", "https://discord.com/*"] },
+        (details, callback) => {
+            details.requestHeaders["User-Agent"] = BrowserUserAgent;
+            const chromeMajor = process.versions.chrome.split(".")[0];
+            details.requestHeaders["Sec-CH-UA"] = `"Chromium";v="${chromeMajor}", "Not(A:Brand";v="24", "Google Chrome";v="${chromeMajor}"`;
+            details.requestHeaders["Sec-CH-UA-Mobile"] = "?0";
+            details.requestHeaders["Sec-CH-UA-Platform"] =
+                process.platform === "win32" ? '"Windows"' : process.platform === "darwin" ? '"macOS"' : '"Linux"';
+            
+            // Remove synthetic or non-standard headers that trigger anti-bot CAPTCHA flags
+            delete details.requestHeaders["X-Vesktop"];
+            delete details.requestHeaders["X-Electron"];
+
+            callback({ requestHeaders: details.requestHeaders });
+        }
+    );
 }
 
 function getWindowBoundsOptions(): BrowserWindowConstructorOptions {
@@ -409,6 +429,7 @@ function createMainWindow() {
     initStaticTitle(win);
 
     win.webContents.setUserAgent(BrowserUserAgent);
+    setupHeaderSanitization(win);
 
     // if the open-url event is fired (in index.ts) while starting up, darwinURL will be set. If not fall back to checking the process args (which Windows and Linux use for URI calling.)
     // win.webContents.session.clearCache().then(() => {

@@ -17,6 +17,12 @@ import { loadView } from "./vesktopStatic";
 
 let updaterWindow: BrowserWindow | null = null;
 
+autoUpdater.setFeedURL({
+    provider: "github",
+    owner: "areqpl",
+    repo: "Owlcord"
+});
+
 autoUpdater.on("update-available", update => {
     if (State.store.updater?.ignoredVersion === update.version) return;
     if ((State.store.updater?.snoozeUntil ?? 0) > Date.now()) return;
@@ -44,7 +50,7 @@ handle(IpcEvents.UPDATER_OPEN, async () => {
 
 function openUpdater(update: UpdateInfo) {
     updaterWindow = new BrowserWindow({
-        title: "Vesktop Updater",
+        title: "Owlcord Updater",
         autoHideMenuBar: true,
         webPreferences: {
             preload: join(__dirname, "updaterPreload.js")
